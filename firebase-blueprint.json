@@ -1,0 +1,306 @@
+{
+  "entities": {
+    "Institution": {
+      "title": "Institution",
+      "description": "Configuração central da instituição religiosa e sede geral",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 150 },
+        "logoUrl": { "type": "string", "maxLength": 500000 },
+        "primaryColor": { "type": "string", "maxLength": 20 },
+        "darkColor": { "type": "string", "maxLength": 20 },
+        "cnpj": { "type": "string", "maxLength": 30 },
+        "address": { "type": "string", "maxLength": 250 },
+        "city": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 50 },
+        "zipCode": { "type": "string", "maxLength": 20 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 150 },
+        "ageGroups": { "type": "array" },
+        "initializedByUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "primaryColor", "darkColor", "initializedByUid", "createdAt", "updatedAt"]
+    },
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Usuário administrativo ou liderança autorizada no sistema",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "name": { "type": "string", "minLength": 2, "maxLength": 150 },
+        "email": { "type": "string", "minLength": 3, "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "role": {
+          "type": "string",
+          "enum": [
+            "presidente_geral",
+            "administrador_geral",
+            "supervisor",
+            "pastor_dirigente",
+            "tesoureiro",
+            "secretario",
+            "lider_departamento"
+          ]
+        },
+        "congregationId": { "type": "string", "maxLength": 128 },
+        "supervisedCongregationIds": { "type": "array" },
+        "departmentId": { "type": "string", "maxLength": 128 },
+        "permissions": { "type": "object" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "email", "role", "active", "permissions", "createdAt", "updatedAt"]
+    },
+    "Congregation": {
+      "title": "Congregation",
+      "description": "Congregação vinculada à instituição",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 150 },
+        "code": { "type": "string", "minLength": 1, "maxLength": 40 },
+        "address": { "type": "string", "maxLength": 250 },
+        "city": { "type": "string", "maxLength": 100 },
+        "state": { "type": "string", "maxLength": 50 },
+        "zipCode": { "type": "string", "maxLength": 20 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 150 },
+        "pastorName": { "type": "string", "maxLength": 150 },
+        "supervisorId": { "type": "string", "maxLength": 128 },
+        "supervisorName": { "type": "string", "maxLength": 150 },
+        "openedAt": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["ativa", "inativa"] },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "code", "status", "createdAt", "updatedAt"]
+    },
+    "Supervisor": {
+      "title": "Supervisor",
+      "description": "Supervisor responsável por uma ou mais congregações",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 150 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 150 },
+        "birthDate": { "type": "string", "maxLength": 30 },
+        "congregationIds": { "type": "array" },
+        "appointedAt": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["ativo", "inativo"] },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "userUid": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "status", "congregationIds", "createdAt", "updatedAt"]
+    },
+    "Member": {
+      "title": "Member",
+      "description": "Membro cadastrado em uma congregação (sem login individual)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 150 },
+        "photoUrl": { "type": "string", "maxLength": 500000 },
+        "birthDate": { "type": "string", "maxLength": 30 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "email": { "type": "string", "maxLength": 150 },
+        "address": { "type": "string", "maxLength": 250 },
+        "congregationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "joinedAt": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["Ativo", "Afastado", "Transferido", "Inativo"] },
+        "roleId": { "type": "string", "maxLength": 128 },
+        "roleName": { "type": "string", "maxLength": 120 },
+        "departmentId": { "type": "string", "maxLength": 128 },
+        "departmentName": { "type": "string", "maxLength": 120 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "transferHistory": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "congregationId", "status", "createdAt", "updatedAt"]
+    },
+    "Role": {
+      "title": "Role",
+      "description": "Cargo e nível hierárquico",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 500 },
+        "responsibilities": { "type": "string", "maxLength": 1000 },
+        "departmentName": { "type": "string", "maxLength": 120 },
+        "hierarchyLevel": { "type": "number" },
+        "superiorRole": { "type": "string", "maxLength": 120 },
+        "congregationId": { "type": "string", "maxLength": 128 },
+        "status": { "type": "string", "enum": ["ativo", "inativo"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "hierarchyLevel", "status", "createdAt", "updatedAt"]
+    },
+    "Department": {
+      "title": "Department",
+      "description": "Departamento de uma congregação",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "description": { "type": "string", "maxLength": 500 },
+        "congregationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "leaderName": { "type": "string", "maxLength": 150 },
+        "viceLeaderName": { "type": "string", "maxLength": 150 },
+        "memberIds": { "type": "array" },
+        "createdDate": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["ativo", "inativo"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "congregationId", "status", "createdAt", "updatedAt"]
+    },
+    "FinancialTransaction": {
+      "title": "FinancialTransaction",
+      "description": "Movimentação financeira de entrada ou despesa",
+      "type": "object",
+      "properties": {
+        "type": { "type": "string", "enum": ["entrada", "despesa"] },
+        "category": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "description": { "type": "string", "minLength": 2, "maxLength": 300 },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "minLength": 8, "maxLength": 20 },
+        "month": { "type": "number" },
+        "year": { "type": "number" },
+        "createdByUid": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "createdByName": { "type": "string", "minLength": 1, "maxLength": 150 },
+        "congregationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "paymentMethod": { "type": "string", "maxLength": 60 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "receiptUrl": { "type": "string", "maxLength": 500000 },
+        "receiptName": { "type": "string", "maxLength": 200 },
+        "reversed": { "type": "boolean" },
+        "reversalReason": { "type": "string", "maxLength": 500 },
+        "reversedByName": { "type": "string", "maxLength": 150 },
+        "reversedAt": { "type": "string", "maxLength": 40 },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["type", "category", "description", "amount", "date", "month", "year", "createdByUid", "createdByName", "congregationId", "reversed", "createdAt", "updatedAt"]
+    },
+    "AccountabilityReport": {
+      "title": "AccountabilityReport",
+      "description": "Prestação de contas mensal de uma congregação",
+      "type": "object",
+      "properties": {
+        "congregationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "month": { "type": "number" },
+        "year": { "type": "number" },
+        "status": {
+          "type": "string",
+          "enum": [
+            "Em preenchimento",
+            "Enviada",
+            "Em análise",
+            "Devolvida",
+            "Aprovada pelo supervisor",
+            "Recebida pela sede"
+          ]
+        },
+        "totalIncome": { "type": "number" },
+        "totalExpense": { "type": "number" },
+        "balance": { "type": "number" },
+        "submittedByUid": { "type": "string", "maxLength": 128 },
+        "submittedByName": { "type": "string", "maxLength": 150 },
+        "submittedAt": { "type": "string", "maxLength": 40 },
+        "reviewedByUid": { "type": "string", "maxLength": 128 },
+        "reviewedByName": { "type": "string", "maxLength": 150 },
+        "reviewedAt": { "type": "string", "maxLength": 40 },
+        "justification": { "type": "string", "maxLength": 1000 },
+        "history": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["congregationId", "month", "year", "status", "totalIncome", "totalExpense", "balance", "createdAt", "updatedAt"]
+    },
+    "EventItem": {
+      "title": "EventItem",
+      "description": "Evento ou atividade na agenda administrativa",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "minLength": 2, "maxLength": 150 },
+        "type": { "type": "string", "maxLength": 60 },
+        "description": { "type": "string", "maxLength": 1000 },
+        "date": { "type": "string", "minLength": 8, "maxLength": 20 },
+        "time": { "type": "string", "maxLength": 20 },
+        "location": { "type": "string", "maxLength": 200 },
+        "congregationId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "responsibleName": { "type": "string", "maxLength": 150 },
+        "status": { "type": "string", "enum": ["Agendado", "Em andamento", "Concluído", "Cancelado"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "date", "congregationId", "status", "createdAt", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Registro imutável de auditoria do sistema",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "userName": { "type": "string", "minLength": 1, "maxLength": 150 },
+        "userEmail": { "type": "string", "maxLength": 150 },
+        "action": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "module": { "type": "string", "minLength": 2, "maxLength": 80 },
+        "targetId": { "type": "string", "maxLength": 128 },
+        "details": { "type": "string", "minLength": 2, "maxLength": 1000 },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "action", "module", "details", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/institutions/{institutionId}": {
+      "schema": { "$ref": "#/entities/Institution" },
+      "description": "Dados da instituição e sede central"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Perfis de usuários administrativos e lideranças"
+    },
+    "/congregations/{congregationId}": {
+      "schema": { "$ref": "#/entities/Congregation" },
+      "description": "Congregações da instituição"
+    },
+    "/supervisors/{supervisorId}": {
+      "schema": { "$ref": "#/entities/Supervisor" },
+      "description": "Supervisores e congregações vinculadas"
+    },
+    "/members/{memberId}": {
+      "schema": { "$ref": "#/entities/Member" },
+      "description": "Membros das congregações"
+    },
+    "/roles/{roleId}": {
+      "schema": { "$ref": "#/entities/Role" },
+      "description": "Cargos e hierarquia"
+    },
+    "/departments/{departmentId}": {
+      "schema": { "$ref": "#/entities/Department" },
+      "description": "Departamentos por congregação"
+    },
+    "/transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/FinancialTransaction" },
+      "description": "Movimentações financeiras"
+    },
+    "/accountability/{reportId}": {
+      "schema": { "$ref": "#/entities/AccountabilityReport" },
+      "description": "Prestações de contas mensais"
+    },
+    "/events/{eventId}": {
+      "schema": { "$ref": "#/entities/EventItem" },
+      "description": "Eventos e agenda administrativa"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Logs imutáveis de auditoria"
+    }
+  }
+}
