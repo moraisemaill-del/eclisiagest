@@ -1,0 +1,6 @@
+{
+  "name": "EcclesiaGest — Gestão Eclesiástica Multicongregacional",
+  "description": "Sistema profissional de gestão eclesiástica multicongregacional com controle de sede, congregações, supervisores, membros, departamentos, financeiro, prestação de contas e auditoria.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,543 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Primitive Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedEmail() {
+      return request.auth != null;
+    }
+
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function getUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActiveUser() {
+      return isSignedIn() && userExists() && getUserDoc().active == true;
+    }
+
+    function isSedeAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'moraisemaill@gmail.com' ||
+        request.auth.token.email == 'suaigreja@gmail.com' ||
+        (userExists() && getUserDoc().active == true && (
+          getUserDoc().role == 'administrador_geral' ||
+          getUserDoc().role == 'presidente_geral'
+        ))
+      );
+    }
+
+    function isSupervisorFor(congId) {
+      return isActiveUser() &&
+        getUserDoc().role == 'supervisor' &&
+        (getUserDoc().supervisedCongregationIds is list) &&
+        (congId in getUserDoc().supervisedCongregationIds);
+    }
+
+    function canAccessCongregation(congId) {
+      return isSedeAdmin() ||
+        isSupervisorFor(congId) ||
+        (isActiveUser() && getUserDoc().congregationId == congId);
+    }
+
+    function isValidString(val, minLen, maxLen) {
+      return val is string && val.size() >= minLen && val.size() <= maxLen;
+    }
+
+    function isOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    // --- Entity Validation Helpers ---
+
+    function isValidInstitution(data) {
+      return data.keys().hasAll(['name', 'primaryColor', 'darkColor', 'initializedByUid', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'name', 'logoUrl', 'primaryColor', 'darkColor', 'cnpj',
+          'address', 'city', 'state', 'zipCode', 'phone', 'email',
+          'ageGroups', 'initializedByUid', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.name, 1, 200) &&
+        isValidString(data.primaryColor, 4, 30) &&
+        isValidString(data.darkColor, 4, 30) &&
+        isValidString(data.initializedByUid, 1, 128) &&
+        isValidString(data.createdAt, 10, 50) &&
+        isValidString(data.updatedAt, 10, 50) &&
+        isOptionalString(data, 'logoUrl', 1000000) &&
+        isOptionalString(data, 'cnpj', 50) &&
+        isOptionalString(data, 'address', 300) &&
+        isOptionalString(data, 'city', 150) &&
+        isOptionalString(data, 'state', 100) &&
+        isOptionalString(data, 'zipCode', 30) &&
+        isOptionalString(data, 'phone', 50) &&
+        isOptionalString(data, 'email', 200) &&
+        (!('ageGroups' in data) || (data.ageGroups is list && data.ageGroups.size() <= 30));
+    }
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['name', 'email', 'role', 'active', 'permissions', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'uid', 'name', 'email', 'phone', 'role', 'congregationId',
+          'supervisedCongregationIds', 'departmentId', 'permissions',
+          'active', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.name, 2, 150) &&
+        isValidString(data.email, 3, 150) &&
+        data.role in [
+          'presidente_geral', 'administrador_geral', 'supervisor',
+          'pastor_dirigente', 'tesoureiro', 'secretario', 'lider_departamento'
+        ] &&
+        data.active is bool &&
+        data.permissions is map &&
+        isValidString(data.createdAt, 10, 40) &&
+        isValidString(data.updatedAt, 10, 40) &&
+        isOptionalString(data, 'uid', 128) &&
+        isOptionalString(data, 'phone', 30) &&
+        isOptionalString(data, 'congregationId', 128) &&
+        isOptionalString(data, 'departmentId', 128) &&
+        (!('supervisedCongregationIds' in data) || (data.supervisedCongregationIds is list && data.supervisedCongregationIds.size() <= 100));
+    }
+
+    function isValidCongregation(data) {
+      return data.keys().hasAll(['name', 'code', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'name', 'code', 'address', 'city', 'state', 'zipCode',
+          'phone', 'email', 'pastorName', 'supervisorId', 'supervisorName',
+          'openedAt', 'status', 'notes', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.name, 2, 150) &&
+        isValidString(data.code, 1, 40) &&
+        data.status in ['ativa', 'inativa'] &&
+        isValidString(data.createdAt, 10, 40) &&
+        isValidString(data.updatedAt, 10, 40) &&
+        isOptionalString(data, 'address', 250) &&
+        isOptionalString(data, 'city', 100) &&
+        isOptionalString(data, 'state', 50) &&
+        isOptionalString(data, 'zipCode', 20) &&
+        isOptionalString(data, 'phone', 30) &&
+        isOptionalString(data, 'email', 150) &&
+        isOptionalString(data, 'pastorName', 150) &&
+        isOptionalString(data, 'supervisorId', 128) &&
+        isOptionalString(data, 'supervisorName', 150) &&
+        isOptionalString(data, 'openedAt', 30) &&
+        isOptionalString(data, 'notes', 1000);
+    }
+
+    function isValidSupervisor(data) {
+      return data.keys().hasAll(['name', 'status', 'congregationIds', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'name', 'phone', 'email', 'birthDate', 'congregationIds',
+          'appointedAt', 'status', 'notes', 'userUid', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.name, 2, 150) &&
+        data.status in ['ativo', 'inativo'] &&
+        data.congregationIds is list && data.congregationIds.size() <= 100 &&
+        isValidString(data.createdAt, 10, 40) &&
+        isValidString(data.updatedAt, 10, 40) &&
+        isOptionalString(data, 'phone', 30) &&
+        isOptionalString(data, 'email', 150) &&
+        isOptionalString(data, 'birthDate', 30) &&
+        isOptionalString(data, 'appointedAt', 30) &&
+        isOptionalString(data, 'notes', 1000) &&
+        isOptionalString(data, 'userUid', 128);
+    }
+
+    function isValidMember(data) {
+      return data.keys().hasAll(['name', 'congregationId', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'name', 'photoUrl', 'birthDate', 'phone', 'email', 'address',
+          'congregationId', 'joinedAt', 'status', 'roleId', 'roleName',
+          'departmentId', 'departmentName', 'notes', 'transferHistory',
+          'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.name, 2, 150) &&
+        isValidString(data.congregationId, 1, 128) &&
+        data.status in ['Ativo', 'Afastado', 'Transferido', 'Inativo'] &&
+        isValidString(data.createdAt, 10, 40) &&
+        isValidString(data.updatedAt, 10, 40) &&
+        isOptionalString(data, 'photoUrl', 500000) &&
+        isOptionalString(data, 'birthDate', 30) &&
+        isOptionalString(data, 'phone', 30) &&
+        isOptionalString(data, 'email', 150) &&
+        isOptionalString(data, 'address', 250) &&
+        isOptionalString(data, 'joinedAt', 30) &&
+        isOptionalString(data, 'roleId', 128) &&
+        isOptionalString(data, 'roleName', 120) &&
+        isOptionalString(data, 'departmentId', 128) &&
+        isOptionalString(data, 'departmentName', 120) &&
+        isOptionalString(data, 'notes', 1000) &&
+        (!('transferHistory' in data) || (data.transferHistory is list && data.transferHistory.size() <= 50));
+    }
+
+    function isValidRole(data) {
+      return data.keys().hasAll(['name', 'hierarchyLevel', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'name', 'description', 'responsibilities', 'departmentName',
+          'hierarchyLevel', 'superiorRole', 'congregationId', 'status',
+          'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.name, 2, 120) &&
+        data.hierarchyLevel is number &&
+        data.status in ['ativo', 'inativo'] &&
+        isValidString(data.createdAt, 10, 40) &&
+        isValidString(data.updatedAt, 10, 40) &&
+        isOptionalString(data, 'description', 500) &&
+        isOptionalString(data, 'responsibilities', 1000) &&
+        isOptionalString(data, 'departmentName', 120) &&
+        isOptionalString(data, 'superiorRole', 120) &&
+        isOptionalString(data, 'congregationId', 128);
+    }
+
+    function isValidDepartment(data) {
+      return data.keys().hasAll(['name', 'congregationId', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'name', 'description', 'congregationId', 'leaderName',
+          'viceLeaderName', 'memberIds', 'createdDate', 'status',
+          'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.name, 2, 120) &&
+        isValidString(data.congregationId, 1, 128) &&
+        data.status in ['ativo', 'inativo'] &&
+        isValidString(data.createdAt, 10, 40) &&
+        isValidString(data.updatedAt, 10, 40) &&
+        isOptionalString(data, 'description', 500) &&
+        isOptionalString(data, 'leaderName', 150) &&
+        isOptionalString(data, 'viceLeaderName', 150) &&
+        isOptionalString(data, 'createdDate', 30) &&
+        (!('memberIds' in data) || (data.memberIds is list && data.memberIds.size() <= 500));
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll([
+          'type', 'category', 'description', 'amount', 'date', 'month', 'year',
+          'createdByUid', 'createdByName', 'congregationId', 'reversed',
+          'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'type', 'category', 'description', 'amount', 'date', 'month', 'year',
+          'createdByUid', 'createdByName', 'congregationId', 'paymentMethod',
+          'notes', 'receiptUrl', 'receiptName', 'reversed', 'reversalReason',
+          'reversedByName', 'reversedAt', 'createdAt', 'updatedAt'
+        ]) &&
+        data.type in ['entrada', 'despesa'] &&
+        isValidString(data.category, 2, 100) &&
+        isValidString(data.description, 2, 300) &&
+        data.amount is number && data.amount > 0 &&
+        isValidString(data.date, 8, 20) &&
+        data.month is number && data.month >= 1 && data.month <= 12 &&
+        data.year is number && data.year >= 2000 && data.year <= 2100 &&
+        isValidString(data.createdByUid, 1, 128) &&
+        isValidString(data.createdByName, 1, 150) &&
+        isValidString(data.congregationId, 1, 128) &&
+        data.reversed is bool &&
+        isValidString(data.createdAt, 10, 40) &&
+        isValidString(data.updatedAt, 10, 40) &&
+        isOptionalString(data, 'paymentMethod', 60) &&
+        isOptionalString(data, 'notes', 1000) &&
+        isOptionalString(data, 'receiptUrl', 500000) &&
+        isOptionalString(data, 'receiptName', 200) &&
+        isOptionalString(data, 'reversalReason', 500) &&
+        isOptionalString(data, 'reversedByName', 150) &&
+        isOptionalString(data, 'reversedAt', 40);
+    }
+
+    function isValidAccountability(data) {
+      return data.keys().hasAll([
+          'congregationId', 'month', 'year', 'status',
+          'totalIncome', 'totalExpense', 'balance', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'congregationId', 'month', 'year', 'status',
+          'totalIncome', 'totalExpense', 'balance',
+          'submittedByUid', 'submittedByName', 'submittedAt',
+          'reviewedByUid', 'reviewedByName', 'reviewedAt',
+          'justification', 'history', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.congregationId, 1, 128) &&
+        data.month is number && data.month >= 1 && data.month <= 12 &&
+        data.year is number && data.year >= 2000 && data.year <= 2100 &&
+        data.status in [
+          'Em preenchimento', 'Enviada', 'Em análise',
+          'Devolvida', 'Aprovada pelo supervisor', 'Recebida pela sede'
+        ] &&
+        data.totalIncome is number &&
+        data.totalExpense is number &&
+        data.balance is number &&
+        isValidString(data.createdAt, 10, 40) &&
+        isValidString(data.updatedAt, 10, 40) &&
+        isOptionalString(data, 'submittedByUid', 128) &&
+        isOptionalString(data, 'submittedByName', 150) &&
+        isOptionalString(data, 'submittedAt', 40) &&
+        isOptionalString(data, 'reviewedByUid', 128) &&
+        isOptionalString(data, 'reviewedByName', 150) &&
+        isOptionalString(data, 'reviewedAt', 40) &&
+        isOptionalString(data, 'justification', 1000) &&
+        (!('history' in data) || (data.history is list && data.history.size() <= 100));
+    }
+
+    function isValidEvent(data) {
+      return data.keys().hasAll(['name', 'date', 'congregationId', 'status', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'name', 'type', 'description', 'date', 'time', 'location',
+          'congregationId', 'responsibleName', 'status', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidString(data.name, 2, 150) &&
+        isValidString(data.date, 8, 20) &&
+        isValidString(data.congregationId, 1, 128) &&
+        data.status in ['Agendado', 'Em andamento', 'Concluído', 'Cancelado'] &&
+        isValidString(data.createdAt, 10, 40) &&
+        isValidString(data.updatedAt, 10, 40) &&
+        isOptionalString(data, 'type', 60) &&
+        isOptionalString(data, 'description', 1000) &&
+        isOptionalString(data, 'time', 20) &&
+        isOptionalString(data, 'location', 200) &&
+        isOptionalString(data, 'responsibleName', 150);
+    }
+
+    function isValidAuditLog(data) {
+      return data.keys().hasAll(['userId', 'userName', 'action', 'module', 'details', 'createdAt']) &&
+        data.keys().hasOnly(['userId', 'userName', 'userEmail', 'action', 'module', 'targetId', 'details', 'createdAt']) &&
+        isValidString(data.userId, 1, 128) &&
+        isValidString(data.userName, 1, 150) &&
+        isValidString(data.action, 2, 100) &&
+        isValidString(data.module, 2, 80) &&
+        isValidString(data.details, 2, 1000) &&
+        isValidString(data.createdAt, 10, 40) &&
+        isOptionalString(data, 'userEmail', 150) &&
+        isOptionalString(data, 'targetId', 128);
+    }
+
+    // --- Collection Rules ---
+
+    match /institutions/{institutionId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn() &&
+        isVerifiedEmail() &&
+        institutionId == 'main' &&
+        !exists(/databases/$(database)/documents/institutions/main) &&
+        isValidInstitution(incoming()) &&
+        incoming().initializedByUid == request.auth.uid;
+      allow update: if isSedeAdmin() &&
+        institutionId == 'main' &&
+        isValidInstitution(incoming()) &&
+        incoming().initializedByUid == existing().initializedByUid &&
+        incoming().createdAt == existing().createdAt;
+      allow delete: if false;
+    }
+
+    match /users/{userId} {
+      allow get: if isSignedIn() && (request.auth.uid == userId || isSedeAdmin());
+      allow list: if isSedeAdmin() || (isActiveUser() && getUserDoc().permissions.manageUsers == true);
+      allow create: if isSignedIn() &&
+        isVerifiedEmail() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        (
+          (userId == request.auth.uid && !exists(/databases/$(database)/documents/users/$(request.auth.uid)) && incoming().active == true) ||
+          (userId == request.auth.uid && exists(/databases/$(database)/documents/userInvites/$(request.auth.token.email)) && incoming().email == request.auth.token.email) ||
+          isSedeAdmin()
+        );
+      allow update: if isSedeAdmin() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().createdAt == existing().createdAt;
+      allow delete: if isSedeAdmin() && userId != request.auth.uid;
+    }
+
+    match /userInvites/{inviteEmail} {
+      allow get: if isSignedIn() && isVerifiedEmail() && (request.auth.token.email == inviteEmail || isSedeAdmin());
+      allow list: if isSedeAdmin() || (isActiveUser() && getUserDoc().permissions.manageUsers == true);
+      allow create, update: if isSedeAdmin() && isValidUserProfile(incoming());
+      allow delete: if isSedeAdmin() || (isSignedIn() && isVerifiedEmail() && request.auth.token.email == inviteEmail);
+    }
+
+    match /congregations/{congregationId} {
+      allow get: if isValidId(congregationId) && canAccessCongregation(congregationId);
+      allow list: if isActiveUser() && (
+        isSedeAdmin() ||
+        (getUserDoc().role == 'supervisor' && (resource.id in getUserDoc().supervisedCongregationIds)) ||
+        (getUserDoc().congregationId == resource.id)
+      );
+      allow create: if isSedeAdmin() &&
+        isValidId(congregationId) &&
+        isValidCongregation(incoming());
+      allow update: if isValidId(congregationId) &&
+        isValidCongregation(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        (isSedeAdmin() || isSupervisorFor(congregationId));
+      allow delete: if isSedeAdmin() && isValidId(congregationId);
+    }
+
+    match /supervisors/{supervisorId} {
+      allow get: if isActiveUser() && isValidId(supervisorId);
+      allow list: if isActiveUser();
+      allow create: if isSedeAdmin() && isValidId(supervisorId) && isValidSupervisor(incoming());
+      allow update: if isSedeAdmin() && isValidId(supervisorId) && isValidSupervisor(incoming()) && incoming().createdAt == existing().createdAt;
+      allow delete: if isSedeAdmin() && isValidId(supervisorId);
+    }
+
+    match /members/{memberId} {
+      allow get: if isValidId(memberId) && canAccessCongregation(existing().congregationId);
+      allow list: if isActiveUser() && (
+        isSedeAdmin() ||
+        (getUserDoc().role == 'supervisor' && (resource.data.congregationId in getUserDoc().supervisedCongregationIds)) ||
+        (getUserDoc().congregationId == resource.data.congregationId)
+      );
+      allow create: if isValidId(memberId) &&
+        isValidMember(incoming()) &&
+        canAccessCongregation(incoming().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.editMembers == true);
+      allow update: if isValidId(memberId) &&
+        isValidMember(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        canAccessCongregation(existing().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.editMembers == true);
+      allow delete: if isSedeAdmin() && isValidId(memberId);
+    }
+
+    match /roles/{roleId} {
+      allow get: if isActiveUser() && isValidId(roleId);
+      allow list: if isActiveUser();
+      allow create: if isActiveUser() &&
+        isValidId(roleId) &&
+        isValidRole(incoming()) &&
+        (isSedeAdmin() || getUserDoc().permissions.manageRoles == true);
+      allow update: if isActiveUser() &&
+        isValidId(roleId) &&
+        isValidRole(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        (isSedeAdmin() || getUserDoc().permissions.manageRoles == true);
+      allow delete: if isSedeAdmin() && isValidId(roleId);
+    }
+
+    match /departments/{departmentId} {
+      allow get: if isValidId(departmentId) && canAccessCongregation(existing().congregationId);
+      allow list: if isActiveUser() && (
+        isSedeAdmin() ||
+        (getUserDoc().role == 'supervisor' && (resource.data.congregationId in getUserDoc().supervisedCongregationIds)) ||
+        (getUserDoc().congregationId == resource.data.congregationId)
+      );
+      allow create: if isValidId(departmentId) &&
+        isValidDepartment(incoming()) &&
+        canAccessCongregation(incoming().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.manageDepartments == true);
+      allow update: if isValidId(departmentId) &&
+        isValidDepartment(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        canAccessCongregation(existing().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.manageDepartments == true);
+      allow delete: if isSedeAdmin() && isValidId(departmentId);
+    }
+
+    match /transactions/{transactionId} {
+      allow get: if isValidId(transactionId) && canAccessCongregation(existing().congregationId);
+      allow list: if isActiveUser() && (
+        isSedeAdmin() ||
+        (getUserDoc().role == 'supervisor' && (resource.data.congregationId in getUserDoc().supervisedCongregationIds)) ||
+        (getUserDoc().congregationId == resource.data.congregationId)
+      );
+      allow create: if isValidId(transactionId) &&
+        isValidTransaction(incoming()) &&
+        incoming().createdByUid == request.auth.uid &&
+        canAccessCongregation(incoming().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.createFinance == true);
+      allow update: if isValidId(transactionId) &&
+        isValidTransaction(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().createdByUid == existing().createdByUid &&
+        canAccessCongregation(existing().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.createFinance == true);
+      allow delete: if isSedeAdmin() && isValidId(transactionId);
+    }
+
+    match /accountability/{reportId} {
+      allow get: if isValidId(reportId) && canAccessCongregation(existing().congregationId);
+      allow list: if isActiveUser() && (
+        isSedeAdmin() ||
+        (getUserDoc().role == 'supervisor' && (resource.data.congregationId in getUserDoc().supervisedCongregationIds)) ||
+        (getUserDoc().congregationId == resource.data.congregationId)
+      );
+      allow create: if isValidId(reportId) &&
+        isValidAccountability(incoming()) &&
+        canAccessCongregation(incoming().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.createFinance == true || getUserDoc().permissions.approveAccountability == true);
+      allow update: if isValidId(reportId) &&
+        isValidAccountability(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        canAccessCongregation(existing().congregationId) &&
+        (
+          // Approval or return by supervisor/sede (must NOT be the submitter!)
+          (
+            (incoming().status == 'Aprovada pelo supervisor' || incoming().status == 'Devolvida' || incoming().status == 'Recebida pela sede' || incoming().status == 'Em análise') &&
+            request.auth.uid != existing().submittedByUid &&
+            (isSedeAdmin() || isSupervisorFor(existing().congregationId) || getUserDoc().permissions.approveAccountability == true)
+          ) ||
+          // Submission or editing by treasurer/local admin
+          (
+            (incoming().status == 'Em preenchimento' || incoming().status == 'Enviada') &&
+            (isSedeAdmin() || getUserDoc().permissions.createFinance == true)
+          )
+        );
+      allow delete: if isSedeAdmin() && isValidId(reportId);
+    }
+
+    match /events/{eventId} {
+      allow get: if isValidId(eventId) && canAccessCongregation(existing().congregationId);
+      allow list: if isActiveUser() && (
+        isSedeAdmin() ||
+        (getUserDoc().role == 'supervisor' && (resource.data.congregationId in getUserDoc().supervisedCongregationIds)) ||
+        (getUserDoc().congregationId == resource.data.congregationId)
+      );
+      allow create: if isValidId(eventId) &&
+        isValidEvent(incoming()) &&
+        canAccessCongregation(incoming().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.manageEvents == true);
+      allow update: if isValidId(eventId) &&
+        isValidEvent(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        canAccessCongregation(existing().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.manageEvents == true);
+      allow delete: if isValidId(eventId) &&
+        canAccessCongregation(existing().congregationId) &&
+        (isSedeAdmin() || getUserDoc().permissions.manageEvents == true);
+    }
+
+    match /auditLogs/{logId} {
+      allow get: if isValidId(logId) && (isSedeAdmin() || (isActiveUser() && getUserDoc().permissions.viewAudit == true));
+      allow list: if isSedeAdmin() || (isActiveUser() && getUserDoc().permissions.viewAudit == true);
+      allow create: if isSignedIn() &&
+        isVerifiedEmail() &&
+        isValidId(logId) &&
+        isValidAuditLog(incoming()) &&
+        incoming().userId == request.auth.uid;
+      // Immutable audit log: never allow update or delete
+      allow update, delete: if false;
+    }
+  }
+}
